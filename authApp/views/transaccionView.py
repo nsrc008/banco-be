@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.backends import TokenBackend
 from rest_framework.permissions import IsAuthenticated
 
+from authApp.models.account import Account
 from authApp.models.transaccion import Transaccion
 from authApp.serializers.transaccionSerializer import TransaccionSerializer
 
@@ -54,9 +55,21 @@ class transaccionCreateView(generics.CreateAPIView):
             stringResponse = {'detail':'Unauthorized Request'}
             return Response(stringResponse, status=status.HTTP_401_UNAUTHORIZED)
 
+        origin_account = Account.objects.get(id=request.data['transaccion_data']['origin_account'])
+        if origin_account.balance < request.data['transaccion_data']['amount']:
+            stringResponse = {'detail':'Slado Insuficiente'}
+            return Response(stringResponse, status=status.HTTP_406_NOT_ACCEPTABLE)
+
         serializer = TransaccionSerializer(data=request.data['transaccion_data'])
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
+        origin_account.balance -= request.data['transaccion_data']['amount']
+        origin_account.save()
+
+        destiny_account = Account.objects.get(id=request.data['transaccion_data']['destiny_account'])
+        destiny_account.balance += request.data['transaccion_data']['amount']
+        destiny_account.save()
 
         return  Response("Transaccion Exitosa", status=status.HTTP_201_CREATED)
 
